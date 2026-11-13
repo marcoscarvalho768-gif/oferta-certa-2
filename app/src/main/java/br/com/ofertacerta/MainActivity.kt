@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
@@ -16,9 +18,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Locale
+
+private data class Produto(
+    val id: Long,
+    val nome: String,
+    val link: String,
+    val precoAlvo: Double
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,142 +45,362 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun OfertaCertaApp() {
-    var pesquisa by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
-    val lojas = listOf(
-        "Amazon",
-        "Mercado Livre",
-        "Shopee",
-        "Magazine Luiza"
-    )
+    var pesquisa by remember { mutableStateOf("") }
+    var nome by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf("") }
+    var preco by remember { mutableStateOf("") }
+    var mensagem by remember { mutableStateOf("") }
+
+    val produtos = remember { mutableStateListOf<Produto>() }
 
     val azul = Color(0xFF142B50)
     val verde = Color(0xFF20B66B)
 
-    MaterialTheme {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF4F6FA))
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(azul)
-                    .padding(20.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        tint = verde,
-                        modifier = Modifier.size(32.dp)
-                    )
+    LaunchedEffect(Unit) {
+        val salvos = context
+            .getSharedPreferences("oferta_certa", 0)
+            .getString("produtos", "[]") ?: "[]"
 
-                    Spacer(modifier = Modifier.width(10.dp))
+        try {
+            val json = JSONArray(salvos)
 
-                    Text(
-                        "OFERTA CERTA",
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            for (i in 0 until json.length()) {
+                val item = json.getJSONObject(i)
 
-                Text(
-                    "Encontre os melhores preços!",
-                    color = Color.White,
-                    fontSize = 14.sp
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                OutlinedTextField(
-                    value = pesquisa,
-                    onValueChange = { pesquisa = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
-                        Text("Qual produto você procura?")
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Pesquisar")
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White
+                produtos.add(
+                    Produto(
+                        item.getLong("id"),
+                        item.getString("nome"),
+                        item.getString("link"),
+                        item.getDouble("precoAlvo")
                     )
                 )
             }
+        } catch (_: Exception) {
+            mensagem = "Não foi possível carregar os produtos salvos."
+        }
+    }
 
-            Column(
-                modifier = Modifier.padding(18.dp)
-            ) {
-                Text(
-                    "Lojas monitoradas",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = azul
-                )
+    fun salvarProdutos() {
+        val json = JSONArray()
 
-                Spacer(modifier = Modifier.height(12.dp))
+        produtos.forEach { produto ->
+            json.put(
+                JSONObject()
+                    .put("id", produto.id)
+                    .put("nome", produto.nome)
+                    .put("link", produto.link)
+                    .put("precoAlvo", produto.precoAlvo)
+            )
+        }
 
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+        context.getSharedPreferences("oferta_certa", 0)
+            .edit()
+            .putString("produtos", json.toString())
+            .apply()
+    }
+
+    MaterialTheme {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF4F6FA)),
+            contentPadding = PaddingValues(bottom = 28.dp)
+        ) {
+
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(azul)
+                        .padding(20.dp)
                 ) {
-                    items(lojas.filter {
-                        it.contains(pesquisa, ignoreCase = true) ||
-                            pesquisa.isBlank()
-                    }) { loja ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color.White
-                            ),
-                            elevation = CardDefaults.cardElevation(2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(18.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    loja,
-                                    modifier = Modifier.weight(1f),
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 16.sp
-                                )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            tint = verde,
+                            modifier = Modifier.size(32.dp)
+                        )
 
-                                Text(
-                                    "Em breve",
-                                    color = verde,
-                                    fontSize = 12.sp
+                        Spacer(Modifier.width(10.dp))
+
+                        Text(
+                            "OFERTA CERTA",
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        "Acompanhe os preços que você deseja pagar",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = pesquisa,
+                        onValueChange = { pesquisa = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = {
+                            Text("Pesquisar produto cadastrado")
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Pesquisar"
+                            )
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White
+                        )
+                    )
+                }
+            }
+
+            item {
+                Column(
+                    Modifier.padding(
+                        horizontal = 18.dp,
+                        vertical = 16.dp
+                    )
+                ) {
+                    Text(
+                        "Cadastrar produto",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = azul
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        "Informe os dados do produto e o preço que gostaria de pagar.",
+                        color = Color.DarkGray,
+                        fontSize = 14.sp
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = nome,
+                        onValueChange = { nome = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nome do produto") },
+                        singleLine = true
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = link,
+                        onValueChange = { link = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Link do produto na loja") },
+                        placeholder = { Text("https://...") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri
+                        )
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = preco,
+                        onValueChange = { preco = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Preço desejado (R$)") },
+                        placeholder = { Text("Ex.: 199,90") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal
+                        )
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            val valor = preco.trim()
+                                .replace(",", ".")
+                                .toDoubleOrNull()
+
+                            when {
+                                nome.isBlank() -> {
+                                    mensagem = "Digite o nome do produto."
+                                }
+
+                                link.isBlank() ||
+                                    !(link.startsWith("https://") ||
+                                      link.startsWith("http://")) -> {
+                                    mensagem = "Informe um link válido começando com http:// ou https://."
+                                }
+
+                                valor == null || valor <= 0.0 -> {
+                                    mensagem = "Digite um preço desejado válido."
+                                }
+
+                                else -> {
+                                    produtos.add(
+                                        Produto(
+                                            System.currentTimeMillis(),
+                                            nome.trim(),
+                                            link.trim(),
+                                            valor
+                                        )
+                                    )
+
+                                    salvarProdutos()
+
+                                    nome = ""
+                                    link = ""
+                                    preco = ""
+
+                                    mensagem = "Produto cadastrado e salvo neste celular."
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = verde
+                        )
+                    ) {
+                        Text(
+                            "Adicionar produto",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    if (mensagem.isNotBlank()) {
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            mensagem,
+                            color = if (mensagem.startsWith("Produto"))
+                                verde
+                            else
+                                Color(0xFFB3261E)
+                        )
+                    }
+                }
+            }
+
+            item {
+                Column(
+                    Modifier.padding(horizontal = 18.dp)
+                ) {
+                    Text(
+                        "Meus produtos",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = azul
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    if (produtos.isEmpty()) {
+                        Text(
+                            "Nenhum produto cadastrado ainda.",
+                            color = Color.DarkGray,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            items(
+                produtos.filter {
+                    it.nome.contains(
+                        pesquisa,
+                        ignoreCase = true
+                    )
+                },
+                key = { it.id }
+            ) { produto ->
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = 18.dp,
+                            vertical = 5.dp
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White
+                    ),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                produto.nome,
+                                modifier = Modifier.weight(1f),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = azul
+                            )
+
+                            IconButton(
+                                onClick = {
+                                    produtos.removeAll {
+                                        it.id == produto.id
+                                    }
+
+                                    salvarProdutos()
+                                    mensagem = "Produto removido."
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Remover produto",
+                                    tint = Color(0xFFB3261E)
                                 )
                             }
                         }
+
+                        Text(
+                            "Preço desejado: " +
+                                String.format(
+                                    Locale("pt", "BR"),
+                                    "R$ %.2f",
+                                    produto.precoAlvo
+                                ),
+                            color = verde,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Text(
+                            produto.link,
+                            color = Color.DarkGray,
+                            fontSize = 12.sp
+                        )
+
+                        Spacer(Modifier.height(6.dp))
+
+                        Text(
+                            "Cadastro salvo. A consulta automática de preços será integrada na próxima etapa.",
+                            color = Color.Gray,
+                            fontSize = 12.sp
+                        )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    "Acompanhe os preços",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = azul
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    "Em breve você poderá acompanhar produtos, " +
-                        "histórico de preços e receber alertas de ofertas.",
-                    color = Color.DarkGray,
-                    fontSize = 14.sp
-                )
             }
         }
     }
