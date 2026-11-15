@@ -1,5 +1,7 @@
 package br.com.ofertacerta
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -138,19 +140,28 @@ fun OfertaCertaApp() {
                     }
 
                     Text(
-                        "Acompanhe os preços que você deseja pagar",
+                        "Encontre as melhores oportunidades!",
                         color = Color.White,
                         fontSize = 14.sp
                     )
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(18.dp))
+
+                    Text(
+                        "Buscar ofertas",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
                         value = pesquisa,
                         onValueChange = { pesquisa = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = {
-                            Text("Pesquisar produto cadastrado")
+                            Text("Ex.: Fone Bluetooth JBL")
                         },
                         leadingIcon = {
                             Icon(
@@ -164,6 +175,47 @@ fun OfertaCertaApp() {
                             focusedContainerColor = Color.White,
                             unfocusedContainerColor = Color.White
                         )
+                    )
+
+                    Spacer(Modifier.height(10.dp))
+
+                    Button(
+                        onClick = {
+                            if (pesquisa.isBlank()) {
+                                mensagem = "Digite o nome de um produto para pesquisar."
+                            } else {
+                                val termo = Uri.encode(pesquisa.trim())
+                                val endereco =
+                                    "https://lista.mercadolivre.com.br/$termo"
+
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(endereco)
+                                )
+
+                                context.startActivity(intent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = verde
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Search,
+                            contentDescription = null
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Buscar no Mercado Livre",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        "A pesquisa será aberta no site do Mercado Livre.",
+                        color = Color.White,
+                        fontSize = 12.sp
                     )
                 }
             }
@@ -185,7 +237,7 @@ fun OfertaCertaApp() {
                     Spacer(Modifier.height(8.dp))
 
                     Text(
-                        "Informe os dados do produto e o preço que gostaria de pagar.",
+                        "Cadastre um produto para acompanhar o preço desejado.",
                         color = Color.DarkGray,
                         fontSize = 14.sp
                     )
@@ -395,7 +447,7 @@ fun OfertaCertaApp() {
                         Spacer(Modifier.height(6.dp))
 
                         Text(
-                            "Cadastro salvo. A consulta automática de preços será integrada na próxima etapa.",
+                            "Produto cadastrado para acompanhamento.",
                             color = Color.Gray,
                             fontSize = 12.sp
                         )
