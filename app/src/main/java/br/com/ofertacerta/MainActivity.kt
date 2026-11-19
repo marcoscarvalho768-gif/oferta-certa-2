@@ -1,3 +1,4 @@
+
 package br.com.ofertacerta
 
 import android.content.Intent
@@ -39,9 +40,7 @@ private data class Produto(
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            OfertaCertaApp()
-        }
+        setContent { OfertaCertaApp() }
     }
 }
 
@@ -61,16 +60,13 @@ fun OfertaCertaApp() {
     val verde = Color(0xFF20B66B)
 
     LaunchedEffect(Unit) {
-        val salvos = context
-            .getSharedPreferences("oferta_certa", 0)
+        val salvos = context.getSharedPreferences("oferta_certa", 0)
             .getString("produtos", "[]") ?: "[]"
 
         try {
             val json = JSONArray(salvos)
-
             for (i in 0 until json.length()) {
                 val item = json.getJSONObject(i)
-
                 produtos.add(
                     Produto(
                         item.getLong("id"),
@@ -87,7 +83,6 @@ fun OfertaCertaApp() {
 
     fun salvarProdutos() {
         val json = JSONArray()
-
         produtos.forEach { produto ->
             json.put(
                 JSONObject()
@@ -104,6 +99,35 @@ fun OfertaCertaApp() {
             .apply()
     }
 
+    fun buscarNaLoja(loja: String) {
+        if (pesquisa.isBlank()) {
+            mensagem = "Digite o produto que deseja pesquisar."
+            return
+        }
+
+        val termo = Uri.encode(pesquisa.trim())
+
+        val endereco = when (loja) {
+            "Mercado Livre" ->
+                "https://lista.mercadolivre.com.br/$termo"
+            "Amazon" ->
+                "https://www.amazon.com.br/s?k=$termo"
+            "Shopee" ->
+                "https://shopee.com.br/search?keyword=$termo"
+            "Google Shopping" ->
+                "https://www.google.com/search?tbm=shop&q=$termo"
+            else -> return
+        }
+
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(endereco))
+            )
+        } catch (_: Exception) {
+            mensagem = "Não foi possível abrir a loja."
+        }
+    }
+
     MaterialTheme {
         LazyColumn(
             modifier = Modifier
@@ -111,7 +135,6 @@ fun OfertaCertaApp() {
                 .background(Color(0xFFF4F6FA)),
             contentPadding = PaddingValues(bottom = 28.dp)
         ) {
-
             item {
                 Column(
                     modifier = Modifier
@@ -119,18 +142,14 @@ fun OfertaCertaApp() {
                         .background(azul)
                         .padding(20.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.ShoppingCart,
                             contentDescription = null,
                             tint = verde,
                             modifier = Modifier.size(32.dp)
                         )
-
                         Spacer(Modifier.width(10.dp))
-
                         Text(
                             "OFERTA CERTA",
                             color = Color.White,
@@ -145,7 +164,7 @@ fun OfertaCertaApp() {
                         fontSize = 14.sp
                     )
 
-                    Spacer(Modifier.height(18.dp))
+                    Spacer(Modifier.height(20.dp))
 
                     Text(
                         "Buscar ofertas",
@@ -160,14 +179,9 @@ fun OfertaCertaApp() {
                         value = pesquisa,
                         onValueChange = { pesquisa = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text("Ex.: Fone Bluetooth JBL")
-                        },
+                        placeholder = { Text("Ex.: Fone Bluetooth JBL") },
                         leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Pesquisar"
-                            )
+                            Icon(Icons.Default.Search, contentDescription = null)
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
@@ -177,43 +191,55 @@ fun OfertaCertaApp() {
                         )
                     )
 
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(14.dp))
+
+                    Text(
+                        "Escolha onde pesquisar:",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(Modifier.height(8.dp))
 
                     Button(
-                        onClick = {
-                            if (pesquisa.isBlank()) {
-                                mensagem = "Digite o nome de um produto para pesquisar."
-                            } else {
-                                val termo = Uri.encode(pesquisa.trim())
-                                val endereco =
-                                    "https://lista.mercadolivre.com.br/$termo"
-
-                                val intent = Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse(endereco)
-                                )
-
-                                context.startActivity(intent)
-                            }
-                        },
+                        onClick = { buscarNaLoja("Mercado Livre") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = verde
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = verde)
                     ) {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = null
-                        )
-                        Spacer(Modifier.width(8.dp))
+                        Text("Buscar no Mercado Livre", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { buscarNaLoja("Amazon") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9900))
+                    ) {
+                        Text("Buscar na Amazon", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { buscarNaLoja("Shopee") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEE4D2D))
+                    ) {
+                        Text("Buscar na Shopee", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = { buscarNaLoja("Google Shopping") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        contentPadding = PaddingValues(12.dp)
+                    ) {
                         Text(
-                            "Buscar no Mercado Livre",
+                            "Buscar no Google Shopping",
+                            color = azul,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
                     Text(
-                        "A pesquisa será aberta no site do Mercado Livre.",
+                        "As pesquisas abrem os sites das lojas.",
                         color = Color.White,
                         fontSize = 12.sp
                     )
@@ -222,10 +248,7 @@ fun OfertaCertaApp() {
 
             item {
                 Column(
-                    Modifier.padding(
-                        horizontal = 18.dp,
-                        vertical = 16.dp
-                    )
+                    Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
                 ) {
                     Text(
                         "Cadastrar produto",
@@ -261,9 +284,7 @@ fun OfertaCertaApp() {
                         label = { Text("Link do produto na loja") },
                         placeholder = { Text("https://...") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Uri
-                        )
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
                     )
 
                     Spacer(Modifier.height(8.dp))
@@ -275,9 +296,7 @@ fun OfertaCertaApp() {
                         label = { Text("Preço desejado (R$)") },
                         placeholder = { Text("Ex.: 199,90") },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Decimal
-                        )
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -289,19 +308,15 @@ fun OfertaCertaApp() {
                                 .toDoubleOrNull()
 
                             when {
-                                nome.isBlank() -> {
+                                nome.isBlank() ->
                                     mensagem = "Digite o nome do produto."
-                                }
 
                                 link.isBlank() ||
-                                    !(link.startsWith("https://") ||
-                                      link.startsWith("http://")) -> {
+                                    !(link.startsWith("https://") || link.startsWith("http://")) ->
                                     mensagem = "Informe um link válido começando com http:// ou https://."
-                                }
 
-                                valor == null || valor <= 0.0 -> {
+                                valor == null || valor <= 0.0 ->
                                     mensagem = "Digite um preço desejado válido."
-                                }
 
                                 else -> {
                                     produtos.add(
@@ -312,53 +327,39 @@ fun OfertaCertaApp() {
                                             valor
                                         )
                                     )
-
                                     salvarProdutos()
-
                                     nome = ""
                                     link = ""
                                     preco = ""
-
                                     mensagem = "Produto cadastrado e salvo neste celular."
                                 }
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = verde
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = verde)
                     ) {
-                        Text(
-                            "Adicionar produto",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Adicionar produto", fontWeight = FontWeight.Bold)
                     }
 
                     if (mensagem.isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
-
                         Text(
                             mensagem,
                             color = if (mensagem.startsWith("Produto"))
-                                verde
-                            else
-                                Color(0xFFB3261E)
+                                verde else Color(0xFFB3261E)
                         )
                     }
                 }
             }
 
             item {
-                Column(
-                    Modifier.padding(horizontal = 18.dp)
-                ) {
+                Column(Modifier.padding(horizontal = 18.dp)) {
                     Text(
                         "Meus produtos",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = azul
                     )
-
                     Spacer(Modifier.height(8.dp))
 
                     if (produtos.isEmpty()) {
@@ -373,32 +374,20 @@ fun OfertaCertaApp() {
 
             items(
                 produtos.filter {
-                    it.nome.contains(
-                        pesquisa,
-                        ignoreCase = true
-                    )
+                    it.nome.contains(pesquisa, ignoreCase = true)
                 },
                 key = { it.id }
             ) { produto ->
-
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            horizontal = 18.dp,
-                            vertical = 5.dp
-                        ),
+                        .padding(horizontal = 18.dp, vertical = 5.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    ),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
                     Column(Modifier.padding(16.dp)) {
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 produto.nome,
                                 modifier = Modifier.weight(1f),
@@ -409,10 +398,7 @@ fun OfertaCertaApp() {
 
                             IconButton(
                                 onClick = {
-                                    produtos.removeAll {
-                                        it.id == produto.id
-                                    }
-
+                                    produtos.removeAll { it.id == produto.id }
                                     salvarProdutos()
                                     mensagem = "Produto removido."
                                 }
@@ -437,15 +423,8 @@ fun OfertaCertaApp() {
                         )
 
                         Spacer(Modifier.height(4.dp))
-
-                        Text(
-                            produto.link,
-                            color = Color.DarkGray,
-                            fontSize = 12.sp
-                        )
-
+                        Text(produto.link, color = Color.DarkGray, fontSize = 12.sp)
                         Spacer(Modifier.height(6.dp))
-
                         Text(
                             "Produto cadastrado para acompanhamento.",
                             color = Color.Gray,
