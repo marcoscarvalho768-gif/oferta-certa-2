@@ -28,29 +28,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
+
+private data class RegistroPreco(val valor: Double, val data: Long)
 
 private data class Produto(
     val id: Long,
     val nome: String,
     val link: String,
-    val precoAtual: Double,
-    val precoAlvo: Double
+    var precoAtual: Double,
+    val precoAlvo: Double,
+    val historico: MutableList<RegistroPreco> = mutableListOf()
 )
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            OfertaCertaApp()
-        }
+        setContent { OfertaCertaApp() }
     }
 }
 
 @Composable
 fun OfertaCertaApp() {
     val context = LocalContext.current
-
     var pesquisa by remember { mutableStateOf("") }
     var nome by remember { mutableStateOf("") }
     var link by remember { mutableStateOf("") }
@@ -59,9 +61,20 @@ fun OfertaCertaApp() {
     var mensagem by remember { mutableStateOf("") }
 
     val produtos = remember { mutableStateListOf<Produto>() }
-
+    val camposAtualizacao = remember { mutableStateMapOf<Long, String>() }
     val azul = Color(0xFF142B50)
     val verde = Color(0xFF20B66B)
+    val formatoData = remember {
+        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("pt", "BR"))
+    }
+
+    fun converterPreco(texto: String): Double? {
+        val limpo = texto.trim().replace("R$", "").replace(" ", "")
+        val normalizado = if (limpo.contains(",")) {
+            limpo.replace(".", "").replace(",", ".")
+        } else limpo
+        return normalizado.toDoubleOrNull()
+    }
 
     LaunchedEffect(Unit) {
         val salvos = context.getSharedPreferences("oferta_certa", 0)
@@ -69,17 +82,34 @@ fun OfertaCertaApp() {
 
         try {
             val json = JSONArray(salvos)
-
             for (i in 0 until json.length()) {
                 val item = json.getJSONObject(i)
+                val historico = mutableListOf<RegistroPreco>()
+                val histJson = item.optJSONArray("historico") ?: JSONArray()
+
+                for (j in 0 until histJson.length()) {
+                    val registro = histJson.getJSONObject(j)
+                    historico.add(
+                        RegistroPreco(
+                            registro.getDouble("valor"),
+                            registro.getLong("data")
+                        )
+                    )
+                }
+
+                val atual = item.optDouble("precoAtual", 0.0)
+                if (historico.isEmpty() && atual > 0.0) {
+                    historico.add(RegistroPreco(atual, System.currentTimeMillis()))
+                }
 
                 produtos.add(
                     Produto(
-                        id = item.getLong("id"),
-                        nome = item.getString("nome"),
-                        link = item.getString("link"),
-                        precoAtual = item.optDouble("precoAtual", 0.0),
-                        precoAlvo = item.getDouble("precoAlvo")
+                        item.getLong("id"),
+                        item.getString("nome"),
+                        item.getString("link"),
+                        atual,
+                        item.getDouble("precoAlvo"),
+                        historico
                     )
                 )
             }
@@ -90,15 +120,24 @@ fun OfertaCertaApp() {
 
     fun salvarProdutos() {
         val json = JSONArray()
+        produtos.forEach { p ->
+            val hist = JSONArray()
+            p.historico.forEach { h ->
+                hist.put(
+                    JSONObject()
+                        .put("valor", h.valor)
+                        .put("data", h.data)
+                )
+            }
 
-        produtos.forEach { produto ->
             json.put(
                 JSONObject()
-                    .put("id", produto.id)
-                    .put("nome", produto.nome)
-                    .put("link", produto.link)
-                    .put("precoAtual", produto.precoAtual)
-                    .put("precoAlvo", produto.precoAlvo)
+                    .put("id", p.id)
+                    .put("nome", p.nome)
+                    .put("link", p.link)
+                    .put("precoAtual", p.precoAtual)
+                    .put("precoAlvo", p.precoAlvo)
+                    .put("historico", hist)
             )
         }
 
@@ -115,27 +154,20 @@ fun OfertaCertaApp() {
         }
 
         val termo = Uri.encode(pesquisa.trim())
-
         val endereco = when (loja) {
             "Mercado Livre" ->
                 "https://lista.mercadolivre.com.br/$termo"
-
             "Amazon" ->
                 "https://www.amazon.com.br/s?k=$termo"
-
             "Shopee" ->
                 "https://shopee.com.br/search?keyword=$termo"
-
             "Google Shopping" ->
                 "https://www.google.com/search?tbm=shop&q=$termo"
-
             else -> return
         }
 
         try {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(endereco))
-            )
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(endereco)))
         } catch (_: Exception) {
             mensagem = "Não foi possível abrir a loja."
         }
@@ -148,16 +180,12 @@ fun OfertaCertaApp() {
                 .background(Color(0xFFF4F6FA)),
             contentPadding = PaddingValues(bottom = 28.dp)
         ) {
-
-            // CABEÇALHO
             item {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    Modifier.fillMaxWidth()
                         .background(azul)
                         .padding(20.dp)
                 ) {
-
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             Icons.Default.ShoppingCart,
@@ -165,9 +193,7 @@ fun OfertaCertaApp() {
                             tint = verde,
                             modifier = Modifier.size(32.dp)
                         )
-
                         Spacer(Modifier.width(10.dp))
-
                         Text(
                             "OFERTA CERTA",
                             color = Color.White,
@@ -178,10 +204,8 @@ fun OfertaCertaApp() {
 
                     Text(
                         "Encontre as melhores oportunidades!",
-                        color = Color.White,
-                        fontSize = 14.sp
+                        color = Color.White
                     )
-
                     Spacer(Modifier.height(20.dp))
 
                     Text(
@@ -190,16 +214,13 @@ fun OfertaCertaApp() {
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
                         value = pesquisa,
                         onValueChange = { pesquisa = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = {
-                            Text("Ex.: Fone Bluetooth JBL")
-                        },
+                        placeholder = { Text("Ex.: Fone Bluetooth JBL") },
                         leadingIcon = {
                             Icon(Icons.Default.Search, contentDescription = null)
                         },
@@ -212,21 +233,13 @@ fun OfertaCertaApp() {
                     )
 
                     Spacer(Modifier.height(14.dp))
-
-                    Text(
-                        "Escolha onde pesquisar:",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
+                    Text("Escolha onde pesquisar:", color = Color.White)
                     Spacer(Modifier.height(8.dp))
 
                     Button(
                         onClick = { buscarNaLoja("Mercado Livre") },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = verde
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = verde)
                     ) {
                         Text("Buscar no Mercado Livre")
                     }
@@ -256,8 +269,7 @@ fun OfertaCertaApp() {
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White
-                        ),
-                        contentPadding = PaddingValues(12.dp)
+                        )
                     ) {
                         Text(
                             "Buscar no Google Shopping",
@@ -274,42 +286,36 @@ fun OfertaCertaApp() {
                 }
             }
 
-            // CADASTRO
             item {
                 Column(
                     Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
                 ) {
-
                     Text(
                         "Cadastrar produto",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = azul
                     )
-
                     Spacer(Modifier.height(8.dp))
-
                     Text(
                         "Cadastre um produto para acompanhar os preços.",
                         color = Color.DarkGray,
                         fontSize = 14.sp
                     )
-
                     Spacer(Modifier.height(12.dp))
 
                     OutlinedTextField(
-                        value = nome,
-                        onValueChange = { nome = it },
+                        nome,
+                        { nome = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Nome do produto") },
                         singleLine = true
                     )
-
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
-                        value = link,
-                        onValueChange = { link = it },
+                        link,
+                        { link = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Link do produto na loja") },
                         placeholder = { Text("https://...") },
@@ -318,12 +324,11 @@ fun OfertaCertaApp() {
                             keyboardType = KeyboardType.Uri
                         )
                     )
-
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
-                        value = precoAtual,
-                        onValueChange = { precoAtual = it },
+                        precoAtual,
+                        { precoAtual = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Preço atual (R$)") },
                         placeholder = { Text("Ex.: 249,90") },
@@ -332,12 +337,11 @@ fun OfertaCertaApp() {
                             keyboardType = KeyboardType.Decimal
                         )
                     )
-
                     Spacer(Modifier.height(8.dp))
 
                     OutlinedTextField(
-                        value = precoAlvo,
-                        onValueChange = { precoAlvo = it },
+                        precoAlvo,
+                        { precoAlvo = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Preço desejado (R$)") },
                         placeholder = { Text("Ex.: 199,90") },
@@ -346,22 +350,14 @@ fun OfertaCertaApp() {
                             keyboardType = KeyboardType.Decimal
                         )
                     )
-
                     Spacer(Modifier.height(12.dp))
 
                     Button(
                         onClick = {
-
-                            val atual = precoAtual.trim()
-                                .replace(",", ".")
-                                .toDoubleOrNull()
-
-                            val alvo = precoAlvo.trim()
-                                .replace(",", ".")
-                                .toDoubleOrNull()
+                            val atual = converterPreco(precoAtual)
+                            val alvo = converterPreco(precoAlvo)
 
                             when {
-
                                 nome.isBlank() ->
                                     mensagem = "Digite o nome do produto."
 
@@ -377,24 +373,24 @@ fun OfertaCertaApp() {
                                     mensagem = "Digite um preço desejado válido."
 
                                 else -> {
-
+                                    val agora = System.currentTimeMillis()
                                     produtos.add(
                                         Produto(
-                                            id = System.currentTimeMillis(),
-                                            nome = nome.trim(),
-                                            link = link.trim(),
-                                            precoAtual = atual,
-                                            precoAlvo = alvo
+                                            agora,
+                                            nome.trim(),
+                                            link.trim(),
+                                            atual,
+                                            alvo,
+                                            mutableListOf(
+                                                RegistroPreco(atual, agora)
+                                            )
                                         )
                                     )
-
                                     salvarProdutos()
-
                                     nome = ""
                                     link = ""
                                     precoAtual = ""
                                     precoAlvo = ""
-
                                     mensagem = "Produto cadastrado com sucesso!"
                                 }
                             }
@@ -404,36 +400,28 @@ fun OfertaCertaApp() {
                             containerColor = verde
                         )
                     ) {
-                        Text(
-                            "Adicionar produto",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Adicionar produto", fontWeight = FontWeight.Bold)
                     }
 
                     if (mensagem.isNotBlank()) {
                         Spacer(Modifier.height(8.dp))
-
                         Text(
                             mensagem,
-                            color = if (
-                                mensagem.startsWith("Produto cadastrado")
-                            ) verde else Color(0xFFB3261E)
+                            color = if (mensagem.startsWith("Produto cadastrado"))
+                                verde else Color(0xFFB3261E)
                         )
                     }
                 }
             }
 
-            // LISTA DE PRODUTOS
             item {
                 Column(Modifier.padding(horizontal = 18.dp)) {
-
                     Text(
                         "Meus produtos",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = azul
                     )
-
                     Spacer(Modifier.height(8.dp))
 
                     if (produtos.isEmpty()) {
@@ -454,8 +442,7 @@ fun OfertaCertaApp() {
             ) { produto ->
 
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
+                    Modifier.fillMaxWidth()
                         .padding(horizontal = 18.dp, vertical = 5.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
@@ -463,11 +450,8 @@ fun OfertaCertaApp() {
                     ),
                     elevation = CardDefaults.cardElevation(2.dp)
                 ) {
-
                     Column(Modifier.padding(16.dp)) {
-
                         Row(verticalAlignment = Alignment.CenterVertically) {
-
                             Text(
                                 produto.nome,
                                 modifier = Modifier.weight(1f),
@@ -478,9 +462,7 @@ fun OfertaCertaApp() {
 
                             IconButton(
                                 onClick = {
-                                    produtos.removeAll {
-                                        it.id == produto.id
-                                    }
+                                    produtos.removeAll { it.id == produto.id }
                                     salvarProdutos()
                                     mensagem = "Produto removido."
                                 }
@@ -494,66 +476,119 @@ fun OfertaCertaApp() {
                         }
 
                         Text(
-                            "Preço atual: " +
+                            "Preço atual: ${
                                 String.format(
                                     Locale("pt", "BR"),
                                     "R$ %.2f",
                                     produto.precoAtual
-                                ),
+                                )
+                            }",
                             color = azul,
                             fontWeight = FontWeight.SemiBold
                         )
 
-                        Spacer(Modifier.height(4.dp))
-
                         Text(
-                            "Preço desejado: " +
+                            "Preço desejado: ${
                                 String.format(
                                     Locale("pt", "BR"),
                                     "R$ %.2f",
                                     produto.precoAlvo
-                                ),
+                                )
+                            }",
                             color = verde,
                             fontWeight = FontWeight.SemiBold
                         )
 
-                        Spacer(Modifier.height(4.dp))
-
                         if (produto.precoAtual > produto.precoAlvo) {
                             Text(
-                                "Você quer economizar " +
+                                "Economia desejada: ${
                                     String.format(
                                         Locale("pt", "BR"),
                                         "R$ %.2f",
                                         produto.precoAtual - produto.precoAlvo
-                                    ),
+                                    )
+                                }",
                                 color = Color(0xFFB3261E),
                                 fontSize = 13.sp
                             )
-                        } else if (produto.precoAtual <= produto.precoAlvo) {
+                        } else {
                             Text(
-                                "O produto está no preço desejado!",
+                                "Produto no preço desejado!",
                                 color = verde,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp
                             )
                         }
 
-                        Spacer(Modifier.height(6.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text(produto.link, color = Color.DarkGray, fontSize = 12.sp)
 
-                        Text(
-                            produto.link,
-                            color = Color.DarkGray,
-                            fontSize = 12.sp
+                        Spacer(Modifier.height(12.dp))
+                        Text("Atualizar preço", fontWeight = FontWeight.Bold, color = azul)
+
+                        OutlinedTextField(
+                            value = camposAtualizacao[produto.id] ?: "",
+                            onValueChange = {
+                                camposAtualizacao[produto.id] = it
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Novo preço (R$)") },
+                            placeholder = { Text("Ex.: 219,90") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal
+                            )
                         )
 
-                        Spacer(Modifier.height(6.dp))
+                        Button(
+                            onClick = {
+                                val novo = converterPreco(
+                                    camposAtualizacao[produto.id] ?: ""
+                                )
 
-                        Text(
-                            "Preço salvo manualmente.",
-                            color = Color.Gray,
-                            fontSize = 12.sp
-                        )
+                                if (novo == null || novo <= 0.0) {
+                                    mensagem = "Digite um novo preço válido."
+                                } else {
+                                    produto.precoAtual = novo
+                                    produto.historico.add(
+                                        RegistroPreco(
+                                            novo,
+                                            System.currentTimeMillis()
+                                        )
+                                    )
+                                    camposAtualizacao[produto.id] = ""
+                                    salvarProdutos()
+                                    mensagem = "Preço atualizado e registrado no histórico."
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = verde
+                            )
+                        ) {
+                            Text("Registrar novo preço")
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+                        Text("Histórico de preços", fontWeight = FontWeight.Bold, color = azul)
+
+                        if (produto.historico.isEmpty()) {
+                            Text("Nenhum histórico ainda.", color = Color.Gray, fontSize = 12.sp)
+                        }
+
+                        produto.historico.sortedByDescending { it.data }.forEach { registro ->
+                            Text(
+                                "${formatoData.format(Date(registro.data))} — ${
+                                    String.format(
+                                        Locale("pt", "BR"),
+                                        "R$ %.2f",
+                                        registro.valor
+                                    )
+                                }",
+                                color = Color.DarkGray,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
             }
